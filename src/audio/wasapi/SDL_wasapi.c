@@ -287,7 +287,11 @@ WASAPI_GetDeviceBuf(_THIS)
     BYTE *buffer = NULL;
 
     while (RecoverWasapiIfLost(this) && this->hidden->render) {
-        if (!WasapiFailed(this, IAudioRenderClient_GetBuffer(this->hidden->render, this->spec.samples, &buffer))) {
+        int samples = this->callbackspec.size / (SDL_AUDIO_BITSIZE(this->spec.format) / 8) / this->spec.channels;
+        if (!WasapiFailed(this, IAudioRenderClient_GetBuffer(this->hidden->render, 
+            //this->spec.samples, 
+            samples,
+            &buffer))) {
             return (Uint8 *) buffer;
         }
         SDL_assert(buffer == NULL);
@@ -301,7 +305,11 @@ WASAPI_PlayDevice(_THIS)
 {
     if (this->hidden->render != NULL) {  /* definitely activated? */
         /* WasapiFailed() will mark the device for reacquisition or removal elsewhere. */
-        WasapiFailed(this, IAudioRenderClient_ReleaseBuffer(this->hidden->render, this->spec.samples, 0));
+        int samples = this->callbackspec.size / (SDL_AUDIO_BITSIZE(this->spec.format) / 8) / this->spec.channels;
+        WasapiFailed(this, IAudioRenderClient_ReleaseBuffer(this->hidden->render, 
+            //this->spec.samples, 
+            samples,
+            0));
     }
 }
 
@@ -309,13 +317,14 @@ static void
 WASAPI_WaitDevice(_THIS)
 {
     while (RecoverWasapiIfLost(this) && this->hidden->client && this->hidden->event) {
-        DWORD waitResult = WaitForSingleObjectEx(this->hidden->event, 200, FALSE);
+        DWORD waitResult = WaitForSingleObjectEx(this->hidden->event, this->spec.perid_ms / 2, FALSE);
         if (waitResult == WAIT_OBJECT_0) {
             const UINT32 maxpadding = this->spec.samples;
             UINT32 padding = 0;
             if (!WasapiFailed(this, IAudioClient_GetCurrentPadding(this->hidden->client, &padding))) {
                 /*SDL_Log("WASAPI EVENT! padding=%u maxpadding=%u", (unsigned int)padding, (unsigned int)maxpadding);*/
-                if (padding <= maxpadding) {
+                if (padding < maxpadding) {
+                    this->callbackspec.size = (maxpadding - padding) * (SDL_AUDIO_BITSIZE(this->spec.format) / 8) * this->spec.channels;
                     break;
                 }
             }
@@ -588,7 +597,7 @@ WASAPI_PrepDevice(_THIS, const SDL_bool updatestream)
     }
 
     streamflags |= AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-    ret = IAudioClient_Initialize(client, sharemode, streamflags, 0, 0, waveformat, NULL);
+    ret = IAudioClient_Initialize(client, sharemode, streamflags, 500000, 0, waveformat, NULL);
     if (FAILED(ret)) {
         return WIN_SetErrorFromHRESULT("WASAPI can't initialize audio client", ret);
     }
@@ -607,12 +616,15 @@ WASAPI_PrepDevice(_THIS, const SDL_bool updatestream)
        interrupts waited for in each call to WaitDevice */
     {
         const float period_millis = default_period / 10000.0f;
-        const float period_frames = period_millis * this->spec.freq / 1000.0f;
-        this->spec.samples = (Uint16)SDL_ceilf(period_frames);
+        this->spec.perid_ms = period_millis;
+        //const float period_frames = period_millis * this->spec.freq / 1000.0f;
+        //this->spec.samples = (Uint16)SDL_ceilf(period_frames);
     }
+    this->spec.samples = bufsize;
 
     /* Update the fragment size as size in bytes */
     SDL_CalculateAudioSpec(&this->spec);
+    
 
     this->hidden->framesize = (SDL_AUDIO_BITSIZE(this->spec.format) / 8) * this->spec.channels;
 

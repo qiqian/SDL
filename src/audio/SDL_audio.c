@@ -714,7 +714,7 @@ SDL_RunAudio(void *devicep)
 
         /* Fill the current buffer with sound */
         if (!device->stream && SDL_AtomicGet(&device->enabled)) {
-            SDL_assert(data_len == device->spec.size);
+            SDL_assert(data_len <= device->spec.size);
             data = current_audio.impl.GetDeviceBuf(device);
         } else {
             /* if the device isn't enabled, we still write to the
@@ -1389,6 +1389,7 @@ open_audio_device(const char *devname, int iscapture,
         }
     }
 
+    obtained->perid_ms = device->spec.perid_ms;
     SDL_CalculateAudioSpec(obtained);  /* recalc after possible changes. */
 
     device->callbackspec = *obtained;
