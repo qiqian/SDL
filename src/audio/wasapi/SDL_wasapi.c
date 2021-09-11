@@ -597,7 +597,7 @@ WASAPI_PrepDevice(_THIS, const SDL_bool updatestream)
     }
 
     streamflags |= AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-    ret = IAudioClient_Initialize(client, sharemode, streamflags, 500000, 0, waveformat, NULL);
+    ret = IAudioClient_Initialize(client, sharemode, streamflags, 0, 0, waveformat, NULL);
     if (FAILED(ret)) {
         return WIN_SetErrorFromHRESULT("WASAPI can't initialize audio client", ret);
     }
