@@ -1118,6 +1118,11 @@ int SDL_EGL_MakeCurrent(_THIS, EGLSurface egl_surface, SDL_GLContext context)
         }
     }
 
+    // force load gl
+    printf("egl : %s, api : %x\n", (char*)
+            _this->egl_data->eglQueryString(_this->egl_data->egl_display, EGL_VERSION),
+            _this->egl_data->eglQueryAPI());            
+    printf("gl : %s\n", (char*)glGetString(GL_VERSION));
     return 0;
 }
 
